@@ -107,23 +107,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
         $act = $_POST['act'];
     }
 
-    if ($act == "del" && isset($id)) {
-        $name = $thiscrl['descr'];
-        if (is_openvpn_server_crl($id)) {
-            $savemsg = sprintf(gettext("Certificate Revocation List %s is in use and cannot be deleted"), $name) . "<br />";
-        } else {
-            foreach ($a_crl as $cid => $acrl) {
-                if ($acrl['refid'] == $thiscrl['refid']) {
-                    unset($a_crl[$cid]);
-                }
-            }
-            write_config(sprintf('Deleted CRL %s', $name));
-            header(url_safe('Location: /system_crlmanager.php'));
-            exit;
-        }
-    } elseif ($act == "delcert" && isset($id)) {
+    if ($act == "delcert" && isset($id)) {
         if (!isset($thiscrl['cert']) || !is_array($thiscrl['cert'])) {
-            header(url_safe('Location: /system_crlmanager.php'));
+            header(url_safe('Location: /ui/pki#authorities'));
             exit;
         }
         $found = false;
@@ -134,14 +120,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
             }
         }
         if (!$found) {
-            header(url_safe('Location: /system_crlmanager.php'));
+            header(url_safe('Location: /ui/pki#authorities'));
             exit;
         }
         $name = $thiscert['descr'];
         if (cert_unrevoke($thiscert, $thiscrl)) {
             plugins_configure('crl');
             write_config(sprintf('Deleted certificate %s from CRL %s', $name, $thiscrl['descr']));
-            header(url_safe('Location: /system_crlmanager.php'));
+            header(url_safe('Location: /ui/pki#authorities'));
             exit;
         } else {
             $savemsg = sprintf(gettext("Failed to delete certificate %s from CRL %s"), $name, $thiscrl['descr']) . "<br />";
@@ -150,7 +136,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
     } elseif ($act == "addcert") {
         $input_errors = array();
         if (!isset($id)) {
-            header(url_safe('Location: /system_crlmanager.php'));
+            header(url_safe('Location: /ui/pki#authorities'));
             exit;
         }
 
@@ -174,7 +160,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
             cert_revoke($cert, $crl, $reason);
             plugins_configure('crl');
             write_config(sprintf('Revoked certificate %s in CRL %s', $cert['descr'], $crl['descr']));
-            header(url_safe('Location: /system_crlmanager.php'));
+            header(url_safe('Location: /ui/pki#authorities'));
             exit;
         }
     } else {
@@ -230,7 +216,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
 
             write_config(sprintf('Saved CRL %s', $crl['descr']));
             plugins_configure('crl');
-            header(url_safe('Location: /system_crlmanager.php'));
+            header(url_safe('Location: /ui/pki#authorities'));
             exit;
         }
     }
@@ -246,30 +232,6 @@ include("head.inc");
   <script>
 
   $( document ).ready(function() {
-    // delete cert revocation list
-    $(".act_delete").click(function(event){
-      event.preventDefault();
-      var id = $(this).data('id');
-      var descr = $(this).data('descr');
-      BootstrapDialog.show({
-        type:BootstrapDialog.TYPE_DANGER,
-        title: "<?=gettext("Certificates");?>",
-        message: "<?=gettext("Do you really want to delete this Certificate Revocation List?");?> (" + descr + ")" ,
-        buttons: [{
-                  label: "<?=gettext("No");?>",
-                  action: function(dialogRef) {
-                    dialogRef.close();
-                  }}, {
-                  label: "<?=gettext("Yes");?>",
-                  action: function(dialogRef) {
-                    $("#id").val(id);
-                    $("#action").val("del");
-                    $("#iform").submit();
-                }
-              }]
-      });
-    });
-
     // Delete certificate from CRL
     $(".act_delete_cert").click(function(event){
       event.preventDefault();
@@ -324,105 +286,9 @@ include("head.inc");
 ?>
       <section class="col-xs-12">
         <div class="content-box tab-content">
-<?php
-        if ($act == "new") :?>
-          <form method="post" name="iform" id="iform">
-            <input type="hidden" name="act" id="action" value="<?=$act;?>"/>
-            <table class="table table-striped opnsense_standard_table_form">
-<?php
-              if (!isset($id)) :?>
-              <tr>
-                <td style="width:22%"><i class="fa fa-info-circle text-muted"></i> <?=gettext("Method");?></td>
-                <td style="width:78%">
-                  <select name="crlmethod" id="crlmethod">
-                    <option value="internal" <?=$pconfig['crlmethod'] == "internal" ? "selected=\"selected\"" : "";?>><?=gettext("Create an internal Certificate Revocation List");?></option>
-                    <option value="existing" <?=$pconfig['crlmethod'] == "existing" ? "selected=\"selected\"" : "";?>><?=gettext("Import an existing Certificate Revocation List");?></option>
-                  </select>
-                </td>
-              </tr>
-<?php
-              endif; ?>
-              <tr>
-                <td><i class="fa fa-info-circle text-muted"></i> <?=gettext("Descriptive name");?></td>
-                <td>
-                  <input name="descr" type="text" id="descr" size="20" value="<?=$pconfig['descr'];?>"/>
-                </td>
-              </tr>
-              <tr>
-                <td><i class="fa fa-info-circle text-muted"></i> <?=gettext("Certificate Authority");?></td>
-                <td>
-                  <select name='caref' id='caref' class="selectpicker">
-<?php foreach ($a_ca as $ca): ?>
-                    <option value="<?= html_safe($ca['refid']) ?>" <?=$pconfig['caref'] == $ca['refid'] ? 'selected="selected"' : '' ?>><?= html_safe($ca['descr']) ?></option>
-<?php endforeach ?>
-                  </select>
-                </td>
-              </tr>
-            </table>
-            <!-- import existing -->
-            <table id="existing" class="table table-striped opnsense_standard_table_form">
-              <thead>
-                <tr>
-                  <th colspan="2"><?=gettext("Existing Certificate Revocation List");?></th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr>
-                  <td style="width:22%"><a id="help_for_crltext" href="#" class="showhelp"><i class="fa fa-info-circle"></i></a> <?=gettext("CRL data");?></td>
-                  <td style="width:78%">
-                    <textarea name="crltext" id="crltext" cols="65" rows="7"><?=$pconfig['crltext'];?></textarea>
-                    <div class="hidden" data-for="help_for_crltext">
-                      <?=gettext("Paste a Certificate Revocation List in X.509 CRL format here.");?>
-                    </div>
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-            <!-- create internal -->
-            <table id="internal" class="table table-striped opnsense_standard_table_form">
-              <thead>
-                <tr>
-                  <th colspan="2"><?=gettext("Internal Certificate Revocation List");?></th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr>
-                  <td style="width:22%"><a id="help_for_lifetime" href="#" class="showhelp"><i class="fa fa-info-circle"></i></a> <?=gettext("Lifetime");?> (<?=gettext("days");?>)</td>
-                  <td style="width:78%">
-                    <input name="lifetime" type="text" id="lifetime" size="5" value="<?=$pconfig['lifetime'];?>"/>
-                    <div class="hidden" data-for="help_for_lifetime">
-                      <?=gettext("Default: 9999");?>
-                    </div>
-                  </td>
-                </tr>
-                <tr>
-                  <td><a id="help_for_serial" href="#" class="showhelp"><i class="fa fa-info-circle"></i></a> <?=gettext("Serial");?></td>
-                  <td>
-                    <input name="serial" type="text" id="serial" size="5" value="<?=$pconfig['serial'];?>"/>
-                    <div class="hidden" data-for="help_for_serial">
-                      <?=gettext("Default: 0");?>
-                    </div>
-                  </td>
-                </tr>
-              </tbody>
-            </table>
 
-            <table class="table table-striped opnsense_standard_table_form">
-              <tr>
-                <td style="width:22%">&nbsp;</td>
-                <td style="width:78%">
-                  <input id="submit" name="save" type="submit" class="btn btn-primary" value="<?=html_safe(gettext('Save')); ?>" />
 <?php
-                  if (isset($id)) :?>
-                  <input name="id" type="hidden" value="<?=$id;?>" />
-<?php
-                  endif;?>
-                </td>
-              </tr>
-            </table>
-          </form>
-<?php
-          elseif ($act == "editimported") :?>
+          if ($act == "editimported") :?>
           <form method="post" name="iform" id="iform">
             <table id="editimported" class="table table-striped opnsense_standard_table_form">
               <tr>
@@ -563,90 +429,101 @@ include("head.inc");
                 endif; ?>
               </tbody>
             </table>
-          </form>
+          </form><?php
+        else :?>
+          <form method="post" name="iform" id="iform">
+            <input type="hidden" name="act" id="action" value="<?=$act;?>"/>
+            <table class="table table-striped opnsense_standard_table_form">
 <?php
-          else :?>
-          <form method="post" id="iform" class="table table-striped">
-            <input type="hidden" name="id" id="id" value=""/>
-            <input type="hidden" name="act" id="action" value=""/>
-            <table class="table table-striped">
+              if (!isset($id)) :?>
+              <tr>
+                <td style="width:22%"><i class="fa fa-info-circle text-muted"></i> <?=gettext("Method");?></td>
+                <td style="width:78%">
+                  <select name="crlmethod" id="crlmethod">
+                    <option value="internal" <?=$pconfig['crlmethod'] == "internal" ? "selected=\"selected\"" : "";?>><?=gettext("Create an internal Certificate Revocation List");?></option>
+                    <option value="existing" <?=$pconfig['crlmethod'] == "existing" ? "selected=\"selected\"" : "";?>><?=gettext("Import an existing Certificate Revocation List");?></option>
+                  </select>
+                </td>
+              </tr>
+<?php
+              endif; ?>
+              <tr>
+                <td><i class="fa fa-info-circle text-muted"></i> <?=gettext("Descriptive name");?></td>
+                <td>
+                  <input name="descr" type="text" id="descr" size="20" value="<?=$pconfig['descr'];?>"/>
+                </td>
+              </tr>
+              <tr>
+                <td><i class="fa fa-info-circle text-muted"></i> <?=gettext("Certificate Authority");?></td>
+                <td>
+                  <select name='caref' id='caref' class="selectpicker">
+<?php foreach ($a_ca as $ca): ?>
+                    <option value="<?= html_safe($ca['refid']) ?>" <?=$pconfig['caref'] == $ca['refid'] ? 'selected="selected"' : '' ?>><?= html_safe($ca['descr']) ?></option>
+<?php endforeach ?>
+                  </select>
+                </td>
+              </tr>
+            </table>
+            <!-- import existing -->
+            <table id="existing" class="table table-striped opnsense_standard_table_form">
               <thead>
                 <tr>
-                  <td><?=gettext("Name");?></td>
-                  <td><?=gettext("Internal");?></td>
-                  <td><?=gettext("Certificates");?></td>
-                  <td><?=gettext("In Use");?></td>
-                  <td class="text-nowrap"></td>
+                  <th colspan="2"><?=gettext("Existing Certificate Revocation List");?></th>
                 </tr>
               </thead>
               <tbody>
-<?php
-                // Map CRLs to CAs
-                $ca_crl_map = array();
-                foreach ($a_crl as $crl) {
-                    $ca_crl_map[$crl['caref']][] = $crl['refid'];
-                }
-
-                foreach ($a_ca as $ca) :?>
                 <tr>
-                  <td colspan="4"> <?=htmlspecialchars($ca['descr']);?></td>
-                  <td class="text-nowrap">
+                  <td style="width:22%"><a id="help_for_crltext" href="#" class="showhelp"><i class="fa fa-info-circle"></i></a> <?=gettext("CRL data");?></td>
+                  <td style="width:78%">
+                    <textarea name="crltext" id="crltext" cols="65" rows="7"><?=$pconfig['crltext'];?></textarea>
+                    <div class="hidden" data-for="help_for_crltext">
+                      <?=gettext("Paste a Certificate Revocation List in X.509 CRL format here.");?>
+                    </div>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+            <!-- create internal -->
+            <table id="internal" class="table table-striped opnsense_standard_table_form">
+              <thead>
+                <tr>
+                  <th colspan="2"><?=gettext("Internal Certificate Revocation List");?></th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td style="width:22%"><a id="help_for_lifetime" href="#" class="showhelp"><i class="fa fa-info-circle"></i></a> <?=gettext("Lifetime");?> (<?=gettext("days");?>)</td>
+                  <td style="width:78%">
+                    <input name="lifetime" type="text" id="lifetime" size="5" value="<?=$pconfig['lifetime'];?>"/>
+                    <div class="hidden" data-for="help_for_lifetime">
+                      <?=gettext("Default: 9999");?>
+                    </div>
+                  </td>
+                </tr>
+                <tr>
+                  <td><a id="help_for_serial" href="#" class="showhelp"><i class="fa fa-info-circle"></i></a> <?=gettext("Serial");?></td>
+                  <td>
+                    <input name="serial" type="text" id="serial" size="5" value="<?=$pconfig['serial'];?>"/>
+                    <div class="hidden" data-for="help_for_serial">
+                      <?=gettext("Default: 0");?>
+                    </div>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+
+            <table class="table table-striped opnsense_standard_table_form">
+              <tr>
+                <td style="width:22%">&nbsp;</td>
+                <td style="width:78%">
+                  <input id="submit" name="save" type="submit" class="btn btn-primary" value="<?=html_safe(gettext('Save')); ?>" />
 <?php
-                  if (!empty($ca['prv'])) :?>
-                    <a href="system_crlmanager.php?act=new&amp;caref=<?=$ca['refid']; ?>" data-toggle="tooltip" title="<?= html_safe(sprintf(gettext('Add or Import CRL for %s'), $ca['descr'])) ?>" class="btn btn-default btn-xs">
-                      <i class="fa fa-plus fa-fw"></i>
-                    </a>
-<?php
-                  else :?>
-                    <a href="system_crlmanager.php?act=new&amp;caref=<?=$ca['refid']; ?>&amp;importonly=yes" data-toggle="tooltip" title="<?= html_safe(sprintf(gettext('Import CRL for %s'), $ca['descr'])) ?>" class="btn btn-default btn-xs">
-                      <i class="fa fa-plus fa-fw"></i>
-                    </a>
+                  if (isset($id)) :?>
+                  <input name="id" type="hidden" value="<?=$id;?>" />
 <?php
                   endif;?>
-                  </td>
-                </tr>
-<?php
-                  if (isset($ca_crl_map[$ca['refid']]) && is_array($ca_crl_map[$ca['refid']])):
-                    foreach ($ca_crl_map[$ca['refid']] as $crl):
-                        $tmpcrl = lookup_crl($crl);
-                        $internal = is_crl_internal($tmpcrl);
-                        $inuse = is_openvpn_server_crl($tmpcrl['refid']);?>
-                <tr>
-                  <td><?=htmlspecialchars($tmpcrl['descr']); ?></td>
-                  <td><?=$internal ? gettext("YES") : gettext("NO"); ?></td>
-                  <td><?=$internal ? (isset($tmpcrl['cert']) ? count($tmpcrl['cert']) : 0) : gettext("Unknown (imported)"); ?></td>
-                  <td><?=$inuse ? gettext("YES") : gettext("NO"); ?></td>
-                  <td class="text-nowrap">
-                    <a href="system_crlmanager.php?act=exp&amp;id=<?=$tmpcrl['refid'];?>" class="btn btn-default btn-xs">
-                        <i class="fa fa-download fa-fw" data-toggle="tooltip" title="<?=gettext("Export CRL") . " " . htmlspecialchars($tmpcrl['descr']);?>"></i>
-                    </a>
-<?php
-                  if ($internal) :?>
-                    <a href="system_crlmanager.php?act=edit&amp;id=<?=$tmpcrl['refid'];?>" class="btn btn-default btn-xs">
-                      <i class="fa fa-pencil fa-fw" data-toggle="tooltip" title="<?=gettext("Edit CRL") . " " . htmlspecialchars($tmpcrl['descr']);?>"></i>
-                    </a>
-<?php
-                  else :?>
-                    <a href="system_crlmanager.php?act=editimported&amp;id=<?=$tmpcrl['refid'];?>" class="btn btn-default btn-xs">
-                      <i class="fa fa-pencil fa-fw" data-toggle="tooltip" title="<?=gettext("Edit CRL") . " " . htmlspecialchars($tmpcrl['descr']);?>"></i>
-                    </a>
-<?php
-                  endif; ?>
-<?php
-                  if (!$inuse) :?>
-                    <a id="del_<?=$tmpcrl['refid'];?>" data-descr="<?=htmlspecialchars($tmpcrl['descr']);?>" data-id="<?=$tmpcrl['refid'];?>" title="<?=gettext("Delete CRL") . " " . htmlspecialchars($tmpcrl['descr']);?>" data-toggle="tooltip"  class="act_delete btn btn-default btn-xs">
-                      <i class="fa fa-trash fa-fw"></i>
-                    </a>
-<?php
-                  endif; ?>
-                  </td>
-                </tr>
-<?php
-                    endforeach;
-                  endif; ?>
-<?php
-                endforeach; ?>
-              </tbody>
+                </td>
+              </tr>
             </table>
           </form>
 <?php
