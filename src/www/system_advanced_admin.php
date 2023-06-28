@@ -49,6 +49,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
     $pconfig['compression'] = isset($config['system']['webgui']['compression']) ? $config['system']['webgui']['compression'] : null;
     $pconfig['ssl-ciphers'] = !empty($config['system']['webgui']['ssl-ciphers']) ? explode(':', $config['system']['webgui']['ssl-ciphers']) : array();
     $pconfig['ssl-hsts'] = isset($config['system']['webgui']['ssl-hsts']);
+    $pconfig['ocsp-staple'] = isset($config['system']['webgui']['ocsp-staple']);
+    $pconfig['ocsp-staple-autocron-disable'] = isset($config['system']['webgui']['ocsp-staple-autocron-disable']);
     $pconfig['disablehttpredirect'] = isset($config['system']['webgui']['disablehttpredirect']);
     $pconfig['httpaccesslog'] = isset($config['system']['webgui']['httpaccesslog']);
     $pconfig['disableconsolemenu'] = isset($config['system']['disableconsolemenu']);
@@ -130,6 +132,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
                     );
                     break;
                 }
+                if (!empty($pconfig['ocsp-staple'])) {
+                   $ca = '';
+                   $ca = ca_chain($cert);
+                   if (empty($ca)) {
+                      $input_errors[] = gettext(
+                          sprintf('No issuing CA certificate found for %s certificate. OCSP stapling is not possible.', $cert['descr'])
+                      );
+                      break;
+                   }
+                }
             }
         }
     }
@@ -159,6 +171,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
             $config['system']['webgui']['interfaces'] != $newinterfaces ||
             (empty($pconfig['httpaccesslog'])) != empty($config['system']['webgui']['httpaccesslog']) ||
             (empty($pconfig['ssl-hsts'])) != empty($config['system']['webgui']['ssl-hsts']) ||
+            (empty($pconfig['ocsp-staple'])) != empty($config['system']['webgui']['ocsp-staple']) ||
+            (empty($pconfig['ocsp-staple-autocron-disable'])) != empty($config['system']['webgui']['ocsp-staple-autocron-disable']) ||
             ($pconfig['disablehttpredirect'] == "yes") != !empty($config['system']['webgui']['disablehttpredirect']) ||
             ($config['system']['deployment'] ?? '') != $pconfig['deployment'];
 
@@ -180,6 +194,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
         } elseif (isset($config['system']['webgui']['ssl-hsts'])) {
             unset($config['system']['webgui']['ssl-hsts']);
         }
+
+        if (!empty($pconfig['ocsp-staple'])) {
+            $config['system']['webgui']['ocsp-staple'] = true;
+        } elseif (isset($config['system']['webgui']['ocsp-staple'])) {
+            unset($config['system']['webgui']['ocsp-staple']);
+        }
+
+        if (!empty($pconfig['ocsp-staple-autocron-disable'])) {
+            $config['system']['webgui']['ocsp-staple-autocron-disable'] = true;
+        } elseif (isset($config['system']['webgui']['ocsp-staple-autocron-disable'])) {
+            unset($config['system']['webgui']['ocsp-staple-autocron-disable']);
+        }
+
 
         if (!empty($pconfig['session_timeout'])) {
             $config['system']['webgui']['session_timeout'] = $pconfig['session_timeout'];
@@ -365,6 +392,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
         filter_configure();
         system_login_configure();
         system_resolver_configure();
+        system_cron_configure();
         plugins_configure('dns');
         plugins_configure('dhcp');
         configd_run('openssh restart', true);
@@ -586,6 +614,26 @@ $(document).ready(function() {
                   <?= gettext('Enable HTTP Strict Transport Security') ?>
                   <div class="hidden" data-for="help_for_sslhsts">
                     <?=gettext("HTTP Strict Transport Security (HSTS) is a web security policy mechanism that helps to protect websites against protocol downgrade attacks and cookie hijacking.");?>
+                  </div>
+                </td>
+              </tr>
+              <tr>
+                <td><a id="help_for_ocspstaple" href="#" class="showhelp"><i class="fa fa-info-circle"></i></a> <?=gettext('OCSP Staple') ?></td>
+                <td>
+                  <input name="ocsp-staple" type="checkbox" value="yes" <?= empty($pconfig['ocsp-staple']) ? '' : 'checked="checked"' ?>/>
+                  <?= gettext('Staple OCSP response') ?>
+                  <div class="hidden" data-for="help_for_ocspstaple">
+                    <?=gettext("Retrieve OCSP data everytime webGUI (re)start and staple it along with the certificate as part of the TLS handshake. Automatic download is only working during start/restart, you need to enable auto-update or setup a cron job to periodically update this data too.");?>
+                  </div>
+                </td>
+              </tr>
+              <tr>
+                <td><a id="help_for_ocspstaple_autocron_disable" href="#" class="showhelp"><i class="fa fa-info-circle"></i></a> <?=gettext('OCSP auto-update') ?></td>
+                <td>
+                  <input name="ocsp-staple-autocron-disable" type="checkbox" value="yes" <?= empty($pconfig['ocsp-staple-autocron-disable']) ? '' : 'checked="checked"' ?>/>
+                  <?= gettext('Disable OCSP response file automatic update') ?>
+                  <div class="hidden" data-for="help_for_ocspstaple_autocron_disable">
+                    <?=gettext("OCSP response file automatic update is enabled by default (if OCSP staple enabled), runs every 5 min and refresh response if needed. If you need a specific schedule or options, disable auto-update and create a \"Update web GUI OCSP data\" cron job with the desired schedule.");?>
                   </div>
                 </td>
               </tr>
