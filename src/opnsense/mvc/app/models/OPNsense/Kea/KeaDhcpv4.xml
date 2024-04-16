@@ -29,6 +29,74 @@
                 <Mask>/^([0-9a-zA-Z.\:\-,_]){0,1024}$/u</Mask>
             </this_server_name>
         </ha>
+        <options>
+          <option type="ArrayField">
+            <name type="TextField">
+              <Required>Y</Required>
+              <Constraints>
+                  <check001>
+                      <ValidationMessage>Duplicate entry exists</ValidationMessage>
+                      <type>UniqueConstraint</type>
+                  </check001>
+              </Constraints>
+            </name>
+            <test type="TextField">
+              <Default></Default>
+            </test>
+            <code type="IntegerField">
+              <Required>Y</Required>
+            </code>
+            <space type="OptionField">
+              <Required>Y</Required>
+              <Default>dhcp4</Default>
+              <OptionValues>
+                <dhcp4>dhcp4</dhcp4>
+                <vendor_encapsulated_options_space>vendor-encapsulated-options-space</vendor_encapsulated_options_space>
+              </OptionValues>
+            </space>
+            <type type="OptionField">
+              <Required>Y</Required>
+              <OptionValues>
+                  <binary>binary</binary>
+                  <boolean>boolean</boolean>
+                  <fqdn>fqdn</fqdn>
+                  <ipv4_address>ipv4-address</ipv4_address>
+                  <ipv6_address>ipv6-address</ipv6_address>
+                  <ipv6_prefix>ipv6-prefix</ipv6_prefix>
+                  <psid>psid</psid>
+                  <record>record</record>
+                  <string>string</string>
+                  <tuple>tuple</tuple>
+                  <uint8>uint8</uint8>
+                  <uint16>uint16</uint16>
+                  <uint32>uint32</uint32>
+                  <int8>int8</int8>
+                  <int16>int16</int16>
+                  <int32>int32</int32>
+              </OptionValues>
+            </type>
+            <array type="BooleanField">
+              <Required>Y</Required>
+              <Default>0</Default>
+            </array>
+            <record_types type="TextField">
+              <Default></Default>
+              <Constraints>
+                  <check001>
+                      <ValidationMessage>Record requires at least one field type.</ValidationMessage>
+                      <type>SetIfConstraint</type>
+                      <field>type</field>
+                      <check>record</check>
+                  </check001>
+              </Constraints>
+              <AsList>Y</AsList>
+              <FieldSeparator>,</FieldSeparator>
+            </record_types>
+            <data type="TextField">
+              <Required>Y</Required>
+            </data>
+          </option>
+        </options>
         <subnets>
             <subnet4 type="ArrayField">
                 <subnet type="NetworkField">
@@ -84,6 +152,18 @@
                         <Mask>/^([^\n"])*$/u</Mask>
                     </boot_file_name>
                 </option_data>
+                <additional_options type="ModelRelationField">
+                  <Multiple>Y</Multiple>
+                  <Model>
+                      <subnets>
+                          <source>OPNsense.Kea.KeaDhcpv4</source>
+                          <items>options.option</items>
+                          <display>name</display>
+                      </subnets>
+                  </Model>
+                  <ValidationMessage>Related option not found</ValidationMessage>
+                  <AsList>1</AsList>
+                </additional_options>
                 <pools type=".\KeaPoolsField">
                 </pools>
             </subnet4>

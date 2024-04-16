@@ -86,4 +86,10 @@
         <type>text</type>
         <help>Boot filename to request</help>
     </field>
+    <field>
+        <id>subnet4.additional_options</id>
+        <label>Additional options</label>
+        <type>select_multiple</type>
+        <style>tokenize</style>
+    </field>
 </form>
