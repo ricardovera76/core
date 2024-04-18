@@ -90,12 +90,8 @@ function filter_core_get_antilockout()
 {
     global $config;
 
-    if (isset($config['system']['webgui']['noantilockout'])) {
-        return [];
-    }
-
-    $lockout_if = get_primary_interface_from_list(array_keys(legacy_config_get_interfaces(['virtual' => false])));
-    if (empty($lockout_if)) {
+    $lockout_ifs = array_keys(legacy_config_get_interfaces(['virtual' => false, 'enable' => true, 'antilockout' => true]));
+    if (empty($lockout_ifs)) {
         return [];
     }
 
@@ -132,8 +128,7 @@ function filter_core_get_antilockout()
 
     sort($lockout_ports);
 
-    /* return a convenient one-entry array to iterate over for our callers */
-    return [$lockout_if => $lockout_ports];
+    return array_combine($lockout_ifs, array_fill(0, count($lockout_ifs), $lockout_ports));
 }
 
 /**
@@ -556,7 +551,7 @@ function filter_core_rules_system($fw, $defaults)
                 'to' => '(self)',
                 'to_port' => implode(' ', $lockoutprts),
                 'descr' => 'anti-lockout rule',
-                '#ref' => 'system_advanced_firewall.php#noantilockout'
+                '#ref' => 'interfaces.php?if=' . $lockoutif
             ),
             $defaults['pass']
         );
