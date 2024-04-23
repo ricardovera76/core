@@ -433,11 +433,23 @@ include("head.inc");
                           </select>
                         </td>
                         <td>
-<?php if (empty($iface['lock'])): ?>
-                          <button title="<?= html_safe(gettext('Delete')) ?>" data-toggle="tooltip" data-id="<?=$ifname;?>" class="btn btn-default act_delete" type="submit">
-                            <i class="fa fa-trash fa-fw"></i>
-                          </button>
-<?php endif ?>
+<?php
+    $deletable = empty($iface['lock']) && empty($iface['antilockout']);
+    $disabledHint = '';
+    if (isset($iface['lock'])) {
+        $disabledHint = html_safe(gettext('• interface is locked')) . '&#013;';
+    }
+    if (isset($iface['antilockout'])) {
+        $disabledHint = $disabledHint . html_safe(gettext('• interface is used by antilockout rule'));
+    }
+    $title = $deletable ? gettext('Delete') : gettext('Delete not possible') . '&#013;' . $disabledHint;
+    $disabled = $deletable ? '' : 'disabled';
+?>
+                          <div class="tooltip-wrapper" title="<?= $title ?>" <?= $disabled ?>>
+                            <button data-toggle="tooltip" data-id="<?=$ifname;?>" class="btn btn-default act_delete" <?= $disabled ?> type="submit">
+                              <i class="fa fa-trash fa-fw"></i>
+                            </button>
+                          </div>
                         </td>
                       </tr>
 <?php endforeach ?>

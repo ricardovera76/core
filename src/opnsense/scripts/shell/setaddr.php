@@ -538,8 +538,8 @@ if ($config['system']['webgui']['protocol'] == 'https') {
 }
 
 if (console_prompt_for_yn('Restore web GUI access defaults?', 'n')) {
-    if (isset($config['system']['webgui']['noantilockout'])) {
-        unset($config['system']['webgui']['noantilockout']);
+    if (empty($config['interfaces'][$interface]['antilockout'])) {
+        $config['interfaces'][$interface]['antilockout'] = true;
         $restart_webgui = true;
     }
     if (isset($config['system']['webgui']['interfaces'])) {
